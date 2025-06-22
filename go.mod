@@ -1,4 +1,4 @@
-module trmnl-api-server
+module trmnld
 
 go 1.21
 

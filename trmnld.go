@@ -136,7 +136,7 @@ func parseArgs() Config {
 
 	if *helpFlag {
 		fmt.Printf("TRMNL API Server %s\n\n", Version)
-		fmt.Println("Usage: trmnl-api-server [options] [image-directory]")
+		fmt.Println("Usage: trmnld [options] [image-directory]")
 		fmt.Println("\nOptions:")
 		flag.PrintDefaults()
 		fmt.Println("\nEnvironment Variables:")

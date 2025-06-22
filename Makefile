@@ -1,5 +1,5 @@
 # Variables
-APP_NAME = trmnl-api-server
+APP_NAME = trmnld
 VERSION ?= $(shell git describe --tags --always --dirty)
 BUILD_TIME = $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 COMMIT = $(shell git rev-parse --short HEAD)

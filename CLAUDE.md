@@ -11,7 +11,7 @@ This is a Go HTTP API server implementing the TRMNL device API specification. It
 ### Building
 - `make build` - Build for current platform
 - `make build-all` - Cross-compile for all platforms
-- `go build -o trmnl-api-server .` - Direct go build
+- `go build -o trmnld .` - Direct go build
 
 ### Testing & Quality
 - `make test` or `go test -v ./...` - Run tests
@@ -29,13 +29,13 @@ This is a Go HTTP API server implementing the TRMNL device API specification. It
 - **Required** environment variable: `SECRET_KEY_BASE` for API key generation
 - Default server runs on port 3000, binding to all interfaces (0.0.0.0)
 - Optional MAC address whitelist via `--mac` (comma-separated, case insensitive)
-- Use `./trmnl-api-server --help` to see all options
+- Use `./trmnld --help` to see all options
 
 ## Architecture
 
 ### Core Components
 
-**Single-file application** (`trmnl_api_server.go`) with these key structures:
+**Single-file application** (`trmnld.go`) with these key structures:
 
 - **Server struct**: Main server with config and device state management
 - **Device registration**: Auto-authentication of all MAC addresses (or whitelist via --mac) with SHA1 API key generation

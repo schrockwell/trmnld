@@ -2,12 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 env:
-  GO_VERSION: '1.21'
+  GO_VERSION: "1.21"
 
 jobs:
   test:
@@ -108,20 +108,20 @@ jobs:
           VERSION=$(git describe --tags --always --dirty)
           BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           COMMIT=$(git rev-parse --short HEAD)
-          
+
           LDFLAGS="-ldflags \"-X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME} -X main.Commit=${COMMIT} -w -s\""
-          
+
           if [ "${{ matrix.goos }}" = "windows" ]; then
-            OUTPUT="trmnl-api-server-${{ matrix.goos }}-${{ matrix.goarch }}.exe"
+            OUTPUT="trmnld-${{ matrix.goos }}-${{ matrix.goarch }}.exe"
           else
-            OUTPUT="trmnl-api-server-${{ matrix.goos }}-${{ matrix.goarch }}"
+            OUTPUT="trmnld-${{ matrix.goos }}-${{ matrix.goarch }}"
           fi
-          
+
           eval "go build ${LDFLAGS} -o ${OUTPUT} ."
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v3
         with:
           name: build-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: trmnl-api-server-*
+          path: trmnld-*
           retention-days: 7

@@ -16,7 +16,7 @@ A single-file standalone HTTP server that serves up a directory of images to TRM
 
 ### Download Pre-built Binaries
 
-Download the latest release for your platform from the [releases page](https://github.com/schrockwell/trmnl-api-server/releases).
+Download the latest release for your platform from the [releases page](https://github.com/schrockwell/trmnld/releases).
 
 ### Build from Source
 
@@ -26,11 +26,11 @@ Download the latest release for your platform from the [releases page](https://g
 
 **Clone and build:**
 ```bash
-git clone https://github.com/schrockwell/trmnl-api-server.git
-cd trmnl-api-server
+git clone https://github.com/schrockwell/trmnld.git
+cd trmnld
 make build
 # or
-go build -o trmnl-api-server .
+go build -o trmnld .
 ```
 
 ### Configuration
@@ -43,25 +43,25 @@ export SECRET_KEY_BASE="your-secret-key-here"
 **Command Line Options:**
 Use `--help` to see all available options:
 ```bash
-./trmnl-api-server --help
+./trmnld --help
 ```
 
 Basic usage:
 ```bash
 # Run with default settings (port 3000, bind to all interfaces)
-./trmnl-api-server
+./trmnld
 
 # Specify custom port and bind address
-./trmnl-api-server --port 8080 --bind 127.0.0.1
+./trmnld --port 8080 --bind 127.0.0.1
 
 # Use custom image directory
-./trmnl-api-server /path/to/images
+./trmnld /path/to/images
 
 # Enable MAC address whitelist
-./trmnl-api-server --mac AA:BB:CC:DD:EE:FF,11:22:33:44:55:66
+./trmnld --mac AA:BB:CC:DD:EE:FF,11:22:33:44:55:66
 
 # Combine options
-./trmnl-api-server --port 8080 --bind 0.0.0.0 --mac AA:BB:CC:DD:EE:FF /path/to/images
+./trmnld --port 8080 --bind 0.0.0.0 --mac AA:BB:CC:DD:EE:FF /path/to/images
 ```
 
 ## API Endpoints
@@ -149,7 +149,7 @@ By default, all MAC addresses are automatically authenticated. You can enable a 
 
 ```bash
 # Allow only specific MAC addresses (case insensitive)
-./trmnl-api-server --mac AA:BB:CC:DD:EE:FF,11:22:33:44:55:66
+./trmnld --mac AA:BB:CC:DD:EE:FF,11:22:33:44:55:66
 ```
 
 When a device attempts to register:
@@ -223,13 +223,13 @@ git push origin v1.0.0
 
 ## Command Line Options
 
-| Option              | Type   | Default   | Description                                       |
-| ------------------- | ------ | --------- | ------------------------------------------------- |
-| `--port`            | int    | `3000`    | HTTP server port                                  |
-| `--bind`            | string | `0.0.0.0` | Address to bind to (0.0.0.0 for all interfaces)   |
+| Option              | Type   | Default   | Description                                                                                                        |
+| ------------------- | ------ | --------- | ------------------------------------------------------------------------------------------------------------------ |
+| `--port`            | int    | `3000`    | HTTP server port                                                                                                   |
+| `--bind`            | string | `0.0.0.0` | Address to bind to (0.0.0.0 for all interfaces)                                                                    |
 | `--mac`             | string | `""`      | Comma-separated list of allowed MAC addresses (case insensitive). If not specified, all MAC addresses are allowed. |
-| `--help`            | bool   | `false`   | Show help message and exit                        |
-| `[image-directory]` | string | `.`       | Directory containing images (positional argument) |
+| `--help`            | bool   | `false`   | Show help message and exit                                                                                         |
+| `[image-directory]` | string | `.`       | Directory containing images (positional argument)                                                                  |
 
 ## Environment Variables
 

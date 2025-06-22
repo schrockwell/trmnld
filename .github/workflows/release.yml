@@ -3,16 +3,16 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release'
+        description: "Tag to release"
         required: true
-        default: 'v0.1.0'
+        default: "v0.1.0"
 
 env:
-  GO_VERSION: '1.21'
+  GO_VERSION: "1.21"
 
 jobs:
   test:
@@ -109,26 +109,26 @@ jobs:
           echo "" >> release_notes.md
           echo "Choose the appropriate binary for your platform:" >> release_notes.md
           echo "" >> release_notes.md
-          echo "- **Linux AMD64**: \`trmnl-api-server-${{ steps.version.outputs.VERSION }}-linux-amd64.tar.gz\`" >> release_notes.md
-          echo "- **Linux ARM64**: \`trmnl-api-server-${{ steps.version.outputs.VERSION }}-linux-arm64.tar.gz\`" >> release_notes.md
-          echo "- **macOS Intel**: \`trmnl-api-server-${{ steps.version.outputs.VERSION }}-darwin-amd64.tar.gz\`" >> release_notes.md
-          echo "- **macOS Apple Silicon**: \`trmnl-api-server-${{ steps.version.outputs.VERSION }}-darwin-arm64.tar.gz\`" >> release_notes.md
-          echo "- **Windows AMD64**: \`trmnl-api-server-${{ steps.version.outputs.VERSION }}-windows-amd64.zip\`" >> release_notes.md
-          echo "- **Windows ARM64**: \`trmnl-api-server-${{ steps.version.outputs.VERSION }}-windows-arm64.zip\`" >> release_notes.md
+          echo "- **Linux AMD64**: \`trmnld-${{ steps.version.outputs.VERSION }}-linux-amd64.tar.gz\`" >> release_notes.md
+          echo "- **Linux ARM64**: \`trmnld-${{ steps.version.outputs.VERSION }}-linux-arm64.tar.gz\`" >> release_notes.md
+          echo "- **macOS Intel**: \`trmnld-${{ steps.version.outputs.VERSION }}-darwin-amd64.tar.gz\`" >> release_notes.md
+          echo "- **macOS Apple Silicon**: \`trmnld-${{ steps.version.outputs.VERSION }}-darwin-arm64.tar.gz\`" >> release_notes.md
+          echo "- **Windows AMD64**: \`trmnld-${{ steps.version.outputs.VERSION }}-windows-amd64.zip\`" >> release_notes.md
+          echo "- **Windows ARM64**: \`trmnld-${{ steps.version.outputs.VERSION }}-windows-arm64.zip\`" >> release_notes.md
           echo "" >> release_notes.md
           echo "### Installation" >> release_notes.md
           echo "" >> release_notes.md
           echo "1. Download the appropriate binary for your platform" >> release_notes.md
           echo "2. Extract the archive" >> release_notes.md
-          echo "3. Make the binary executable (Linux/macOS): \`chmod +x trmnl-api-server-*\`" >> release_notes.md
+          echo "3. Make the binary executable (Linux/macOS): \`chmod +x trmnld-*\`" >> release_notes.md
           echo "4. Create a \`config.toml\` file with your configuration" >> release_notes.md
           echo "5. Set the \`SECRET_KEY_BASE\` environment variable" >> release_notes.md
-          echo "6. Run the server: \`./trmnl-api-server-*\`" >> release_notes.md
+          echo "6. Run the server: \`./trmnld-*\`" >> release_notes.md
           echo "" >> release_notes.md
           echo "### Checksums" >> release_notes.md
           echo "" >> release_notes.md
           echo "Verify your download with SHA256 checksums in \`checksums.txt\`" >> release_notes.md
-          
+
           if [ -f CHANGELOG.md ]; then
             echo "" >> release_notes.md
             echo "### Changes" >> release_notes.md
