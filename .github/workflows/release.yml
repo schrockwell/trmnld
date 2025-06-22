@@ -1,0 +1,159 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release'
+        required: true
+        default: 'v0.1.0'
+
+env:
+  GO_VERSION: '1.21'
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: go test -v ./...
+
+      - name: Run go vet
+        run: go vet ./...
+
+  build:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    needs: test
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Download dependencies
+        run: make deps
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build all platforms
+        run: |
+          export VERSION=${{ steps.version.outputs.VERSION }}
+          make build-all
+
+      - name: Create distribution packages
+        run: |
+          export VERSION=${{ steps.version.outputs.VERSION }}
+          make dist
+
+      - name: Generate checksums
+        run: make checksums
+
+      - name: Create release notes
+        id: release_notes
+        run: |
+          echo "## Release ${{ steps.version.outputs.VERSION }}" > release_notes.md
+          echo "" >> release_notes.md
+          echo "### Downloads" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "Choose the appropriate binary for your platform:" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "- **Linux AMD64**: \`trmnl-api-server-${{ steps.version.outputs.VERSION }}-linux-amd64.tar.gz\`" >> release_notes.md
+          echo "- **Linux ARM64**: \`trmnl-api-server-${{ steps.version.outputs.VERSION }}-linux-arm64.tar.gz\`" >> release_notes.md
+          echo "- **macOS Intel**: \`trmnl-api-server-${{ steps.version.outputs.VERSION }}-darwin-amd64.tar.gz\`" >> release_notes.md
+          echo "- **macOS Apple Silicon**: \`trmnl-api-server-${{ steps.version.outputs.VERSION }}-darwin-arm64.tar.gz\`" >> release_notes.md
+          echo "- **Windows AMD64**: \`trmnl-api-server-${{ steps.version.outputs.VERSION }}-windows-amd64.zip\`" >> release_notes.md
+          echo "- **Windows ARM64**: \`trmnl-api-server-${{ steps.version.outputs.VERSION }}-windows-arm64.zip\`" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### Installation" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "1. Download the appropriate binary for your platform" >> release_notes.md
+          echo "2. Extract the archive" >> release_notes.md
+          echo "3. Make the binary executable (Linux/macOS): \`chmod +x trmnl-api-server-*\`" >> release_notes.md
+          echo "4. Create a \`config.toml\` file with your configuration" >> release_notes.md
+          echo "5. Set the \`SECRET_KEY_BASE\` environment variable" >> release_notes.md
+          echo "6. Run the server: \`./trmnl-api-server-*\`" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### Checksums" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "Verify your download with SHA256 checksums in \`checksums.txt\`" >> release_notes.md
+          
+          if [ -f CHANGELOG.md ]; then
+            echo "" >> release_notes.md
+            echo "### Changes" >> release_notes.md
+            echo "" >> release_notes.md
+            # Extract changes for this version from CHANGELOG if it exists
+            awk '/^## / {if(found) exit; if($0 ~ /'"${{ steps.version.outputs.VERSION }}"'/) found=1; next} found' CHANGELOG.md >> release_notes.md || true
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          name: Release ${{ steps.version.outputs.VERSION }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.VERSION, '-') }}
+          files: |
+            dist/*
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-artifacts-${{ steps.version.outputs.VERSION }}
+          path: |
+            build/
+            dist/
+          retention-days: 30
