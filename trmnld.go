@@ -20,7 +20,7 @@ import (
 
 const (
 	DefaultRefreshRate = 900 // Default image duration in seconds
-	DefaultSecretKey   = "default_secret"
+	DefaultSecretKey   = "TRMNL"
 	FriendlyIDLength   = 6 // Length of friendly ID
 )
 
@@ -48,14 +48,15 @@ type DisplayResponse struct {
 	FirmwareURL     string `json:"firmware_url,omitempty"`
 	SpecialFunction string `json:"special_function,omitempty"`
 	Action          string `json:"action,omitempty"`
+	Error           string `json:"error,omitempty"`
 }
 
 type SetupResponse struct {
 	Status     int    `json:"status"`
-	APIKey     string `json:"api_key,omitempty"`
-	FriendlyID string `json:"friendly_id,omitempty"`
-	ImageURL   string `json:"image_url,omitempty"`
-	Message    string `json:"message,omitempty"`
+	APIKey     string `json:"api_key"`
+	FriendlyID string `json:"friendly_id"`
+	ImageURL   string `json:"image_url"`
+	Message    string `json:"message"`
 }
 
 type LogRequest struct {
@@ -79,10 +80,9 @@ func main() {
 	// Parse command line arguments first (for --help)
 	config := parseArgs()
 
-	// Check for required environment variable
+	// Write out a warning if SECRET_KEY_BASE is not set
 	if os.Getenv("SECRET_KEY_BASE") == "" {
-		log.Fatal("SECRET_KEY_BASE environment variable is required")
-		os.Exit(1)
+		log.Println("Warning: SECRET_KEY_BASE environment variable is not set. Unauthorized clients will be able to fetch screens.")
 	}
 
 	server := &Server{
@@ -104,6 +104,7 @@ func main() {
 	api := r.PathPrefix("/api").Subrouter()
 	api.HandleFunc("/display", server.handleDisplay).Methods("GET", "OPTIONS")
 	api.HandleFunc("/setup", server.handleSetup).Methods("GET", "OPTIONS")
+	api.HandleFunc("/setup/", server.handleSetup).Methods("GET", "OPTIONS")
 	api.HandleFunc("/log", server.handleLog).Methods("POST", "OPTIONS")
 
 	// Image serving route
@@ -140,7 +141,7 @@ func parseArgs() Config {
 		fmt.Println("\nOptions:")
 		flag.PrintDefaults()
 		fmt.Println("\nEnvironment Variables:")
-		fmt.Println("  SECRET_KEY_BASE    Required. Used for API key generation.")
+		fmt.Println("  SECRET_KEY_BASE    Optional, highly recommended. Used for device API key generation.")
 		fmt.Println("\nArguments:")
 		fmt.Println("  image-directory    Directory containing images (default: current directory)")
 		os.Exit(0)
@@ -197,7 +198,7 @@ func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func (s *Server) isMACSAllowed(macAddress string) bool {
+func (s *Server) isMACAllowed(macAddress string) bool {
 	// If no MAC whitelist is configured, allow all
 	if len(s.config.AllowedMACs) == 0 {
 		return true
@@ -227,10 +228,10 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if MAC address is allowed
-	if !s.isMACSAllowed(macAddress) {
+	if !s.isMACAllowed(macAddress) {
 		log.Printf("MAC address %s was denied", macAddress)
 		s.sendJSONResponse(w, SetupResponse{
-			Status:  403,
+			Status:  404,
 			Message: "MAC address not authorized",
 		})
 		return
@@ -238,14 +239,7 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("MAC address %s was authenticated", macAddress)
 
-	// Generate API key (SHA1 of MAC + SECRET_KEY_BASE)
-	secretKeyBase := os.Getenv("SECRET_KEY_BASE")
-	if secretKeyBase == "" {
-		secretKeyBase = DefaultSecretKey
-	}
-
-	hash := sha1.Sum([]byte(macAddress + secretKeyBase))
-	apiKey := fmt.Sprintf("%x", hash)
+	apiKey := generateAPIKey(macAddress)
 
 	// Generate friendly ID (first 6 chars of API key, uppercase, with dash)
 	friendlyID := strings.ToUpper(apiKey[:3]) + "-" + strings.ToUpper(apiKey[3:FriendlyIDLength])
@@ -254,26 +248,34 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		Status:     200,
 		APIKey:     apiKey,
 		FriendlyID: friendlyID,
-		Message:    fmt.Sprintf("Register at usetrmnl.com/signup with Device ID '%s'", friendlyID),
+		Message:    fmt.Sprintf("Device registered with friendly ID '%s'", friendlyID),
+		ImageURL:   fmt.Sprintf("%s://%s/images/%s", r.URL.Scheme, r.Host, s.images[0]),
 	})
 }
 
-func (s *Server) handleDisplay(w http.ResponseWriter, r *http.Request) {
-	accessToken := r.Header.Get("Access-Token")
-	if accessToken == "" {
-		s.sendJSONResponse(w, DisplayResponse{
-			Status:      401,
-			RefreshRate: DefaultRefreshRate,
-		})
-		return
+func generateAPIKey(mac string) string {
+	secretKeyBase := os.Getenv("SECRET_KEY_BASE")
+	if secretKeyBase == "" {
+		secretKeyBase = DefaultSecretKey
 	}
 
-	// Validate token and get MAC address
-	macAddress, err := s.validateToken(accessToken)
-	if err != nil {
+	hash := sha1.Sum([]byte(mac + secretKeyBase))
+	return fmt.Sprintf("%x", hash)
+}
+
+func validateAPIKey(mac string, token string) bool {
+	return generateAPIKey(mac) == token
+}
+
+func (s *Server) handleDisplay(w http.ResponseWriter, r *http.Request) {
+	macAddress := r.Header.Get("ID")
+	accessToken := r.Header.Get("Access-Token")
+
+	if macAddress == "" || accessToken == "" || !validateAPIKey(macAddress, accessToken) {
 		s.sendJSONResponse(w, DisplayResponse{
-			Status:      404,
-			RefreshRate: DefaultRefreshRate,
+			Status:        500,
+			Error:         "Device not found",
+			ResetFirmware: true,
 		})
 		return
 	}
@@ -281,7 +283,7 @@ func (s *Server) handleDisplay(w http.ResponseWriter, r *http.Request) {
 	// Get or create device state
 	s.stateMutex.Lock()
 	if s.deviceState[macAddress] == nil {
-		s.deviceState[macAddress] = &DeviceState{CurrentImageIndex: -1}
+		s.deviceState[macAddress] = &DeviceState{CurrentImageIndex: 0} // first image was already returned during setup
 	}
 	state := s.deviceState[macAddress]
 	s.stateMutex.Unlock()
@@ -289,6 +291,7 @@ func (s *Server) handleDisplay(w http.ResponseWriter, r *http.Request) {
 	// Find next image
 	nextImage, duration, err := s.getNextImage(state.CurrentImageIndex)
 	if err != nil {
+		// TODO: return a "no images found" image
 		s.sendJSONResponse(w, DisplayResponse{
 			Status:      404,
 			RefreshRate: DefaultRefreshRate,
@@ -311,7 +314,7 @@ func (s *Server) handleDisplay(w http.ResponseWriter, r *http.Request) {
 	imageURL := fmt.Sprintf("%s://%s/images/%s", scheme, host, nextImage.Filename)
 
 	s.sendJSONResponse(w, DisplayResponse{
-		Status:          200,
+		Status:          0,
 		ImageURL:        imageURL,
 		Filename:        nextImage.Filename,
 		RefreshRate:     duration,
@@ -364,19 +367,6 @@ func (s *Server) loadImages() error {
 	s.images = images
 
 	return nil
-}
-
-func (s *Server) validateToken(token string) (string, error) {
-	// Get SECRET_KEY_BASE
-	secretKeyBase := os.Getenv("SECRET_KEY_BASE")
-	if secretKeyBase == "" {
-		secretKeyBase = DefaultSecretKey
-	}
-
-	// We need to reverse-engineer the MAC address from the token
-	// Since we auto-auth all devices, we can't validate against a specific list
-	// For now, just return a placeholder MAC address based on the token
-	return fmt.Sprintf("device_%s", token[:8]), nil
 }
 
 func (s *Server) getNextImage(currentIndex int) (ImageInfo, int, error) {
