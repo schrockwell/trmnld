@@ -24,11 +24,11 @@ This is a Go HTTP API server implementing the TRMNL device API specification. It
 - `make deps` - Download and tidy dependencies
 
 ### Configuration
-- Command line arguments: `--port`, `--bind`, `--mac`, `--help`
+- Command line arguments: `--port`, `--bind`, `--setup`, `--help`
 - Positional argument: image directory path (defaults to current directory)
 - **Required** environment variable: `SECRET_KEY_BASE` for API key generation
 - Default server runs on port 3000, binding to all interfaces (0.0.0.0)
-- Optional MAC address whitelist via `--mac` (comma-separated, case insensitive)
+- Device provisioning requires `--setup` flag to enable `/api/setup` endpoint
 - Use `./trmnld --help` to see all options
 
 ## Architecture
@@ -38,7 +38,7 @@ This is a Go HTTP API server implementing the TRMNL device API specification. It
 **Single-file application** (`trmnld.go`) with these key structures:
 
 - **Server struct**: Main server with config and device state management
-- **Device registration**: Auto-authentication of all MAC addresses (or whitelist via --mac) with SHA1 API key generation
+- **Device registration**: Device provisioning via `/api/setup` when `--setup` flag is enabled, with SHA1 API key generation
 - **Image serving**: Incremental image delivery from shared image directory
 - **State management**: Thread-safe per-device playlist position tracking with mutex
 - **Direct image endpoint**: `/images/{filename}` with security validation
@@ -46,7 +46,7 @@ This is a Go HTTP API server implementing the TRMNL device API specification. It
 
 ### API Endpoints
 
-- `GET /api/setup` - Device registration (requires `ID` header with MAC address) - **Auto-authenticates all devices or uses whitelist**
+- `GET /api/setup` - Device registration (requires `ID` header with MAC address) - **Requires --setup flag to be enabled**
 - `GET /api/display` - Image serving (requires `Access-Token` header) - Returns next image in playlist
 - `POST /api/log` - Device logging (requires `Access-Token` header)
 - `GET /images/{filename}` - Direct image serving with security validation
@@ -66,8 +66,8 @@ Single shared image directory containing:
 - **Duration parsing**: Extracts custom durations from filenames
 - **Dynamic URL generation**: Uses request hostname for image URLs (works with any domain/IP)
 - **Friendly ID format**: ABC-123 (3 chars, dash, 3 chars)
-- **Authentication logging**: Logs MAC address authentication attempts to terminal
-- **Auto-authentication**: All MAC addresses are automatically authenticated (or whitelist via --mac option)
+- **Authentication logging**: Logs device registration attempts to terminal
+- **Controlled provisioning**: Device registration only available when `--setup` flag is enabled
 - **Thread-safe state**: Concurrent device state management
 - **Security validation**: Path traversal protection for image serving
 - **Cross-platform builds**: Linux, macOS, Windows (AMD64 & ARM64)

@@ -32,10 +32,10 @@ var (
 )
 
 type Config struct {
-	Bind        string
-	Port        int
-	ImageDir    string
-	AllowedMACs []string
+	Bind     string
+	Port     int
+	ImageDir string
+	Setup    bool
 }
 
 type DisplayResponse struct {
@@ -115,10 +115,10 @@ func main() {
 	log.Printf("Server starting on %s", addr)
 	log.Printf("Serving images from: %s", config.ImageDir)
 	log.Printf("Found %d images", len(server.images))
-	if len(config.AllowedMACs) > 0 {
-		log.Printf("MAC whitelist enabled: %s", strings.Join(config.AllowedMACs, ", "))
+	if config.Setup {
+		log.Printf("Device provisioning enabled via --setup flag")
 	} else {
-		log.Printf("MAC whitelist disabled: all MAC addresses allowed")
+		log.Printf("Device provisioning disabled - use --setup flag to enable")
 	}
 
 	log.Fatal(http.ListenAndServe(addr, r))
@@ -130,7 +130,7 @@ func parseArgs() Config {
 	// Define flags
 	portFlag := flag.Int("port", 3000, "Port to listen on")
 	bindFlag := flag.String("bind", "0.0.0.0", "Address to bind to")
-	macFlag := flag.String("mac", "", "Comma-separated list of allowed MAC addresses (case insensitive). If not specified, all MAC addresses are allowed.")
+	setupFlag := flag.Bool("setup", false, "Allow device provisioning via /api/setup endpoint")
 	helpFlag := flag.Bool("help", false, "Show help message")
 
 	flag.Parse()
@@ -149,16 +149,7 @@ func parseArgs() Config {
 
 	config.Port = *portFlag
 	config.Bind = *bindFlag
-
-	// Parse MAC addresses if provided
-	if *macFlag != "" {
-		macs := strings.Split(*macFlag, ",")
-		for i, mac := range macs {
-			// Normalize MAC address (uppercase, trim spaces)
-			macs[i] = strings.ToUpper(strings.TrimSpace(mac))
-		}
-		config.AllowedMACs = macs
-	}
+	config.Setup = *setupFlag
 
 	// Get image directory from args or use current directory
 	args := flag.Args()
@@ -198,24 +189,6 @@ func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func (s *Server) isMACAllowed(macAddress string) bool {
-	// If no MAC whitelist is configured, allow all
-	if len(s.config.AllowedMACs) == 0 {
-		return true
-	}
-
-	// Normalize the incoming MAC address (uppercase)
-	normalizedMAC := strings.ToUpper(macAddress)
-
-	// Check if MAC is in the allowed list
-	for _, allowedMAC := range s.config.AllowedMACs {
-		if normalizedMAC == allowedMAC {
-			return true
-		}
-	}
-
-	return false
-}
 
 func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	macAddress := r.Header.Get("ID")
@@ -227,12 +200,13 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if MAC address is allowed
-	if !s.isMACAllowed(macAddress) {
-		log.Printf("MAC address %s was denied", macAddress)
-		s.sendJSONResponse(w, SetupResponse{
-			Status:  404,
-			Message: "MAC address not authorized",
+	// Check if setup is enabled
+	if !s.config.Setup {
+		log.Printf("Setup attempt from MAC address %s denied - setup flag not set", macAddress)
+		s.sendJSONResponse(w, DisplayResponse{
+			Status:        500,
+			ResetFirmware: false,
+			Error:         "Setup not enabled",
 		})
 		return
 	}
